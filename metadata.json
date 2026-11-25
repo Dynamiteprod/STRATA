@@ -1,0 +1,6 @@
+{
+  "name": "STRATA",
+  "description": "Plateforme d'écoute musicale en couches : curseur de profondeur à 5 crans (écoute, paroles, accords/tempo, stems, studio), généalogie jouable synchronisée, orchestre de poche multi-appareils et forks rémunérés.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,187 @@
+openapi: 3.1.0
+info:
+  title: STRATA API
+  version: 1.0.0
+  description: API REST/JSON STRATA (Section 10) — Streaming en couches, Généalogie, Orchestre de poche, Forks & Grand Livre XOF.
+servers:
+  - url: https://api.strata.ci/v1
+paths:
+  /auth/otp/request:
+    post:
+      summary: Demande d'un code OTP par téléphone (Côte d'Ivoire +225 prioritaire)
+      responses:
+        "202":
+          description: OTP envoyé par SMS
+  /auth/otp/verify:
+    post:
+      summary: Vérification OTP et émission JWT + refresh token
+      responses:
+        "200":
+          description: Authentifié
+  /search:
+    get:
+      summary: Recherche par titre, artiste, paroles, BPM et tonalité
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: bpm
+          in: query
+          schema: { type: number }
+        - name: key
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Résultats du catalogue
+  /tracks/{id}:
+    get:
+      summary: Métadonnées, licence active, et crans disponibles
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Détails du morceau
+  /tracks/{id}/stream:
+    get:
+      summary: Manifeste HLS signé (URL courte durée)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: quality
+          in: query
+          schema: { type: string, enum: [eco, normal, high] }
+      responses:
+        "200":
+          description: URL signée HLS
+  /tracks/{id}/analysis:
+    get:
+      summary: Fichier analysis.json versionné (cran >= 1)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Grille de temps, accords, paroles, sections
+  /tracks/{id}/stems:
+    get:
+      summary: URLs signées des stems (cran >= 3, droits & abonnement vérifiés côté serveur)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: URLs signées Opus 64-96 kb/s
+        "403":
+          description: Licence artiste ou abonnement insuffisant
+  /tracks/{id}/lineage:
+    get:
+      summary: Graphe des versions liées et tables d'alignement DTW
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Liens et points d'alignement
+  /forks:
+    post:
+      summary: Créer un fork léger (JSON)
+      responses:
+        "201":
+          description: Fork créé
+  /forks/{id}:
+    patch:
+      summary: Mettre à jour un fork
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Fork mis à jour
+  /forks/{id}/publish:
+    post:
+      summary: Publier un fork (vérifie licence allow_fork et détection fork vide)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Fork publié
+  /orchestra/sessions:
+    post:
+      summary: Créer une session d'Orchestre de poche
+      responses:
+        "201":
+          description: Code session à 4 chiffres + QR
+  /orchestra/sessions/{code}/join:
+    post:
+      summary: Rejoindre une session d'Orchestre (couvert par l'abonnement hôte)
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Connecté
+  /events/play:
+    post:
+      summary: Envoi groupé des événements d'écoute hors-ligne/en-ligne
+      responses:
+        "202":
+          description: Événements enregistrés au grand livre
+  /artist/uploads:
+    post:
+      summary: Dépôt master WAV 24 bits + stems officiels + ISRC/ISWC
+      responses:
+        "202":
+          description: Ingestion démarrée
+  /artist/uploads/{id}/status:
+    get:
+      summary: Suivi du pipeline d'analyse GPU
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Statut d'ingestion
+  /artist/stats:
+    get:
+      summary: Statistiques pistes isolées, passages bouclés, forks et sessions d'orchestre
+      responses:
+        "200":
+          description: Statistiques artiste
+  /artist/statements:
+    get:
+      summary: Relevé de revenus mensuels XOF (grand livre double entrée)
+      responses:
+        "200":
+          description: Relevé financier
+  /payments/webhook/{provider}:
+    post:
+      summary: Webhook agrégateur Mobile Money (Orange, MTN, Moov, Wave)
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Traité

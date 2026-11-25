@@ -1,0 +1,10 @@
+Parametre,Description,Unite,Valeur_a_renseigner,Formule_ou_Note
+prix_abonnement_mensuel_fcfa,Prix TTC paye par l'abonne (Premium/Pro),FCFA/mois,[A_RENSEIGNER],Entree (ex. 2000 ou 5000)
+tva_taux,TVA applicable aux services numeriques en CI,%,[A_RENSEIGNER],A cadrer avec expert-comptable (ex. 18%)
+commission_agregateur_mobile_money,Frais CinetPay/PayDunya/Wave sur encaissement,%,[A_RENSEIGNER],Comparer 2-3 agregateurs locaux
+revenu_net_fcfa,Revenu net apres taxes et commission paiement,FCFA/mois,=prix*(1-tva)*(1-commission),Calcul automatique
+part_ayants_droit_streaming,Part reversee BURIDA/SACEM + producteurs/artistes,%,[A_RENSEIGNER],A negocier avec BURIDA et labels
+cout_cdn_par_abonne_fcfa,Cout bande passante HLS + stems par abonne/mois,FCFA/mois,[A_RENSEIGNER],Dependant part Ecoute Eco vs Stems
+cout_stockage_par_abonne_fcfa,Stockage objet R2/GCS amorti par abonne,FCFA/mois,[A_RENSEIGNER],R2 = 0 frais de sortie
+cout_support_paiement_sortant_fcfa,Frais support + virement Mobile Money artiste,FCFA/mois,[A_RENSEIGNER],A chiffrer avec agregateur
+marge_unitaire_nette_fcfa,Marge nette par abonne payant,FCFA/mois,=revenu_net - ayants_droit - cdn - stockage - support,Doit etre > 0 pour equilibre

@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">STRATA</string>
+    <string name="tagline">Chaque chanson s\'ouvre comme une session de studio</string>
+    <string name="nav_discover">Découvrir</string>
+    <string name="nav_orchestra">Orchestre</string>
+    <string name="nav_artist">Artiste</string>
+    <string name="nav_account">Compte</string>
+    <string name="depth_0">Écoute</string>
+    <string name="depth_1">Paroles</string>
+    <string name="depth_2">Musicien</string>
+    <string name="depth_3">Pistes</string>
+    <string name="depth_4">Studio</string>
+    <string name="chords_unverified">Accords non vérifiés</string>
+    <string name="data_warning_title">Téléchargement des stems sur réseau mobile</string>
+    <string name="data_warning_body">4 stems à 64 kb/s consomment environ 2× plus de data qu\'un mix Normal (~6,7 Mo pour 3 min 30). Continuer ?</string>
+</resources>
