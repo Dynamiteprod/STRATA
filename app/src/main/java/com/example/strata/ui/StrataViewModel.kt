@@ -1,9 +1,15 @@
 package com.example.strata.ui
 
+import android.Manifest
 import android.app.Application
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
+import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -11,6 +17,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.strata.data.LocalMusicRepository
 import com.example.strata.data.StrataCatalog
 import com.example.strata.domain.AppLanguage
 import com.example.strata.domain.ArtistAnalytics
@@ -33,7 +40,9 @@ import com.example.strata.domain.Track
 import com.example.strata.domain.VersionLink
 import com.example.strata.engine.ClockSyncProtocol
 import com.example.strata.engine.LedgerEngine
+import com.example.strata.engine.LocalAudioStreamDecoder
 import com.example.strata.engine.MultiStemAudioEngine
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,6 +73,10 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
         val searchQuery: String = "",
         val selectedGenre: GenreStyle? = null,
         val onlyOfflineFilter: Boolean = false,
+        val onlyLocalFilter: Boolean = false,
+        val hasAudioPermission: Boolean = false,
+        val isScanningLocalMusic: Boolean = false,
+        val localTracksCount: Int = 0,
         val currentDepth: DepthLevel = DepthLevel.ECOUTE,
         val isPlayerExpanded: Boolean = false,
         val showGenealogySheet: Boolean = false,
@@ -98,11 +111,20 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
     val playbackState: StateFlow<MultiStemAudioEngine.PlaybackState> = audioEngine.state
 
     private var playCounter = 100
+    private val sampledWaveformIds = mutableSetOf<String>()
 
     init {
+        audioEngine.attachContext(application)
         val detectedNet = detectNetworkContext(application)
         val initialQuality = if (detectedNet == NetworkContext.CELLULAR) StreamingQuality.ECO else StreamingQuality.NORMAL
-        _uiState.update { it.copy(networkContext = detectedNet, streamingQuality = initialQuality) }
+        val audioGranted = hasRequiredAudioPermission(application)
+        _uiState.update {
+            it.copy(
+                networkContext = detectedNet,
+                streamingQuality = initialQuality,
+                hasAudioPermission = audioGranted
+            )
+        }
 
         // Seed realistic initial ledger entries (standard plays + fork play)
         seedInitialLedger()
@@ -139,6 +161,93 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
         audioEngine.setOnTrackEndedListener {
             playNextTrack()
         }
+        audioEngine.setOnPlaybackErrorListener { msg ->
+            showToast(msg)
+        }
+        if (audioGranted) {
+            scanLocalMusic(showFeedback = false)
+        }
+    }
+
+    fun requiredAudioPermission(): String =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+    fun hasRequiredAudioPermission(context: Context = getApplication()): Boolean =
+        ContextCompat.checkSelfPermission(context, requiredAudioPermission()) == PackageManager.PERMISSION_GRANTED
+
+    fun onAudioPermissionResult(granted: Boolean) {
+        _uiState.update { it.copy(hasAudioPermission = granted) }
+        if (granted) {
+            scanLocalMusic(showFeedback = true)
+        } else {
+            showToast("Autorisation refusée. Utilise « Importer des fichiers » pour choisir tes morceaux.")
+        }
+    }
+
+    fun scanLocalMusic(showFeedback: Boolean = true) {
+        if (_uiState.value.isScanningLocalMusic) return
+        _uiState.update { it.copy(isScanningLocalMusic = true) }
+        viewModelScope.launch {
+            val scanned = LocalMusicRepository.scanDeviceMusic(getApplication())
+            _uiState.update { state ->
+                val existingPicked = state.catalog.filter {
+                    it.localUriString != null && it.id.startsWith("loc_pick_")
+                }
+                val baseCatalog = state.catalog.filter { it.localUriString == null }
+                val mergedLocal = (existingPicked + scanned).distinctBy { it.localUriString }
+                val mergedCatalog = mergedLocal + baseCatalog
+                state.copy(
+                    catalog = mergedCatalog,
+                    queueTrackIds = mergedCatalog.map { it.id },
+                    localTracksCount = mergedLocal.size,
+                    isScanningLocalMusic = false,
+                    onlyLocalFilter = if (showFeedback && mergedLocal.isNotEmpty()) true else state.onlyLocalFilter
+                )
+            }
+            if (showFeedback) {
+                if (scanned.isEmpty()) {
+                    showToast("Aucune musique détectée dans MediaStore. Essaie « Importer des fichiers ».")
+                } else {
+                    showToast("${scanned.size} musique(s) du téléphone prête(s) pour le studio STRATA !")
+                }
+            }
+        }
+    }
+
+    fun importAudioFiles(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        val app = getApplication<Application>()
+        uris.forEach { uri ->
+            try {
+                app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Throwable) {
+            }
+        }
+        viewModelScope.launch {
+            val imported = LocalMusicRepository.importPickedAudioUris(app, uris)
+            if (imported.isEmpty()) {
+                showToast("Impossible d'importer les fichiers sélectionnés.")
+                return@launch
+            }
+            _uiState.update { state ->
+                val existingLocal = state.catalog.filter { it.localUriString != null }
+                val baseCatalog = state.catalog.filter { it.localUriString == null }
+                val mergedLocal = (imported + existingLocal).distinctBy { it.localUriString }
+                val mergedCatalog = mergedLocal + baseCatalog
+                state.copy(
+                    catalog = mergedCatalog,
+                    queueTrackIds = mergedCatalog.map { it.id },
+                    localTracksCount = mergedLocal.size,
+                    onlyLocalFilter = true
+                )
+            }
+            showToast("${imported.size} fichier(s) audio importé(s) !")
+            playTrack(imported.first(), expandPlayer = true)
+        }
     }
 
     private fun seedInitialLedger() {
@@ -174,19 +283,24 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(onlyOfflineFilter = !it.onlyOfflineFilter) }
     }
 
+    fun toggleLocalFilter() {
+        _uiState.update { it.copy(onlyLocalFilter = !it.onlyLocalFilter) }
+    }
+
     fun filteredTracks(): List<Track> {
         val s = _uiState.value
         val q = s.searchQuery.trim().lowercase()
         return s.catalog.filter { track ->
             val matchesGenre = s.selectedGenre == null || track.genre == s.selectedGenre
             val matchesOffline = !s.onlyOfflineFilter || track.isDownloadedOffline
+            val matchesLocal = !s.onlyLocalFilter || track.localUriString != null
             val matchesQuery = q.isEmpty() ||
                 track.title.lowercase().contains(q) ||
                 track.artistName.lowercase().contains(q) ||
                 track.analysis.tempo.bpm.toInt().toString().contains(q) ||
                 track.analysis.key.display().lowercase().contains(q) ||
                 track.analysis.lyrics.any { it.text.lowercase().contains(q) }
-            matchesGenre && matchesOffline && matchesQuery
+            matchesGenre && matchesOffline && matchesLocal && matchesQuery
         }
     }
 
@@ -197,6 +311,28 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
         }
         if (expandPlayer) {
             _uiState.update { it.copy(isPlayerExpanded = true) }
+        }
+        if (track.localUriString != null && sampledWaveformIds.add(track.id)) {
+            viewModelScope.launch(Dispatchers.IO) {
+                val realPeaks = LocalAudioStreamDecoder.sampleQuickWaveform(
+                    getApplication(),
+                    Uri.parse(track.localUriString),
+                    bars = 64
+                )
+                _uiState.update { state ->
+                    val updatedCatalog = state.catalog.map { t ->
+                        if (t.id == track.id) {
+                            t.copy(
+                                analysis = t.analysis.copy(
+                                    stems = t.analysis.stems.map { st -> st.copy(waveformPeaks = realPeaks) }
+                                )
+                            )
+                        } else t
+                    }
+                    state.copy(catalog = updatedCatalog)
+                }
+                audioEngine.updateTrackWaveforms(track.id, realPeaks)
+            }
         }
         // Record play event into double-entry ledger
         recordPlayInLedger(track, fork)

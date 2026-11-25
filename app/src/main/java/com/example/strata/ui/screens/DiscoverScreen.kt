@@ -1,5 +1,8 @@
 package com.example.strata.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,26 +28,34 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.CallSplit
 import androidx.compose.material.icons.rounded.AccountTree
+import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.DataSaverOn
+import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.Wifi
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +90,11 @@ fun DiscoverScreen(
     uiState: StrataViewModel.UiState,
     filteredTracks: List<Track>,
     currentPlayingTrackId: String?,
+    requiredAudioPermission: String,
+    onAudioPermissionResult: (Boolean) -> Unit,
+    onScanLocalMusic: () -> Unit,
+    onImportAudioFiles: (List<Uri>) -> Unit,
+    onToggleLocalFilter: () -> Unit,
     onSearchChange: (String) -> Unit,
     onGenreSelect: (GenreStyle?) -> Unit,
     onToggleOfflineFilter: () -> Unit,
@@ -87,6 +104,20 @@ fun DiscoverScreen(
     onPlayFork: (ForkSpec, Track) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        onAudioPermissionResult(granted)
+    }
+
+    val audioPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            onImportAudioFiles(uris)
+        }
+    }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 112.dp),
@@ -192,6 +223,22 @@ fun DiscoverScreen(
             }
         }
 
+        // 1b. Local Phone Music Access & Import Card
+        item {
+            LocalMusicAccessCard(
+                hasPermission = uiState.hasAudioPermission,
+                isScanning = uiState.isScanningLocalMusic,
+                localCount = uiState.localTracksCount,
+                onGrantPermissionClick = {
+                    audioPermissionLauncher.launch(requiredAudioPermission)
+                },
+                onRescanClick = onScanLocalMusic,
+                onImportFilesClick = {
+                    audioPickerLauncher.launch(arrayOf("audio/*"))
+                }
+            )
+        }
+
         // 2. Search by Title, Artist, Lyrics, BPM, Key
         item {
             OutlinedTextField(
@@ -222,12 +269,39 @@ fun DiscoverScreen(
             )
         }
 
-        // 3. Genre & Offline Filter Chips
+        // 3. Local, Offline & Genre Filter Chips
         item {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                item {
+                    FilterChip(
+                        selected = uiState.onlyLocalFilter,
+                        onClick = onToggleLocalFilter,
+                        label = {
+                            Text(
+                                if (uiState.localTracksCount > 0) {
+                                    "Sur mon téléphone (${uiState.localTracksCount})"
+                                } else {
+                                    "Sur mon téléphone"
+                                }
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Rounded.Smartphone,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = LaguneTeal.copy(alpha = 0.24f),
+                            selectedLabelColor = LaguneTeal
+                        ),
+                        modifier = Modifier.testTag("filter_local_music")
+                    )
+                }
                 item {
                     FilterChip(
                         selected = uiState.onlyOfflineFilter,
@@ -346,7 +420,11 @@ fun DiscoverScreen(
         // 5. Catalog Section Title
         item {
             Text(
-                text = "Catalogue Ouest-Africain Ouvert (${filteredTracks.size})",
+                text = if (uiState.onlyLocalFilter) {
+                    "Tes musiques sur le téléphone (${filteredTracks.size})"
+                } else {
+                    "Catalogue & Musiques (${filteredTracks.size})"
+                },
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
@@ -452,7 +530,11 @@ private fun TrackCatalogCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "${track.artistName} • ${track.genre.labelFr}",
+                    text = if (track.localUriString != null) {
+                        "${track.artistName} • ${track.releaseTitle}"
+                    } else {
+                        "${track.artistName} • ${track.genre.labelFr}"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary,
                     maxLines = 1,
@@ -463,8 +545,13 @@ private fun TrackCatalogCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    MetaTagPill("${track.analysis.tempo.bpm.toInt()} BPM", KoraGold)
-                    MetaTagPill(track.analysis.key.display(), LaguneTeal)
+                    if (track.localUriString != null) {
+                        MetaTagPill("Téléphone", LaguneTeal)
+                        MetaTagPill("4 Stems DSP", KoraGold)
+                    } else {
+                        MetaTagPill("${track.analysis.tempo.bpm.toInt()} BPM", KoraGold)
+                        MetaTagPill(track.analysis.key.display(), LaguneTeal)
+                    }
                     if (lineageCount > 0) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -486,15 +573,160 @@ private fun TrackCatalogCard(
                 }
             }
 
-            IconButton(
-                onClick = onToggleOffline,
-                modifier = Modifier.testTag("offline_btn_${track.id}")
+            if (track.localUriString != null) {
+                Box(
+                    modifier = Modifier.size(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.AudioFile,
+                        contentDescription = "Fichier audio sur le téléphone",
+                        tint = LaguneTeal
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = onToggleOffline,
+                    modifier = Modifier.testTag("offline_btn_${track.id}")
+                ) {
+                    Icon(
+                        imageVector = if (track.isDownloadedOffline) Icons.Rounded.CheckCircle else Icons.Rounded.CloudDownload,
+                        contentDescription = if (track.isDownloadedOffline) "Disponible hors-ligne" else "Télécharger hors-ligne",
+                        tint = if (track.isDownloadedOffline) LaguneTeal else TextMuted
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalMusicAccessCard(
+    hasPermission: Boolean,
+    isScanning: Boolean,
+    localCount: Int,
+    onGrantPermissionClick: () -> Unit,
+    onRescanClick: () -> Unit,
+    onImportFilesClick: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (hasPermission) StudioSurface else StudioSurfaceHigh
+        ),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .border(1.dp, LaguneTeal.copy(alpha = 0.45f), RoundedCornerShape(18.dp))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Icon(
-                    imageVector = if (track.isDownloadedOffline) Icons.Rounded.CheckCircle else Icons.Rounded.CloudDownload,
-                    contentDescription = if (track.isDownloadedOffline) "Disponible hors-ligne" else "Télécharger hors-ligne",
-                    tint = if (track.isDownloadedOffline) LaguneTeal else TextMuted
-                )
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(LaguneTeal.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isScanning) {
+                        CircularProgressIndicator(
+                            color = LaguneTeal,
+                            strokeWidth = 2.5.dp,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.LibraryMusic,
+                            contentDescription = "Bibliothèque audio du téléphone",
+                            tint = LaguneTeal
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (hasPermission) {
+                            "Musiques du téléphone ($localCount)"
+                        } else {
+                            "Écouter tes musiques du téléphone"
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (hasPermission) {
+                            "MP3, M4A, WAV & FLAC prêts avec séparation 4 pistes, Karaoké & tempo."
+                        } else {
+                            "Autorise l'accès à ta musique locale ou importe des fichiers audio."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (!hasPermission) {
+                    Button(
+                        onClick = onGrantPermissionClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = LaguneTeal, contentColor = ObsidianBg),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .testTag("grant_audio_permission_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Smartphone,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Autoriser l'accès", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = onRescanClick,
+                        enabled = !isScanning,
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .testTag("rescan_local_music_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Actualiser", maxLines = 1)
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = onImportFilesClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                        .testTag("import_audio_files_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.FolderOpen,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Importer", maxLines = 1)
+                }
             }
         }
     }

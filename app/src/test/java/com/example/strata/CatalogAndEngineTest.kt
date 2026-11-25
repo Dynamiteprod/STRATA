@@ -1,5 +1,6 @@
 package com.example.strata
 
+import com.example.strata.data.LocalMusicRepository
 import com.example.strata.data.StrataCatalog
 import com.example.strata.domain.StemType
 import com.example.strata.engine.MultiStemAudioEngine
@@ -59,6 +60,36 @@ class CatalogAndEngineTest {
 
         engine.clearLoop()
         assertEquals(null, engine.state.value.loopStartMs)
+        engine.release()
+    }
+
+    @Test
+    fun `local phone track builds valid 4 stems, 10000 bp split, and updates waveforms in engine`() {
+        val localTrack = LocalMusicRepository.buildLocalTrack(
+            id = "loc_42",
+            title = "Mon Son Abidjan.mp3",
+            artistName = "DJ Test",
+            releaseTitle = "Téléphone",
+            durationMs = 195_000L,
+            uriString = "content://media/external/audio/media/42"
+        )
+
+        assertEquals("content://media/external/audio/media/42", localTrack.localUriString)
+        assertTrue(localTrack.isDownloadedOffline)
+        assertEquals(4, localTrack.analysis.stems.size)
+        assertEquals(10000, localTrack.splits.sumOf { it.shareBp })
+        assertTrue(localTrack.license.allowStems)
+
+        val combined = listOf(localTrack) + StrataCatalog.tracks
+        val onlyLocal = combined.filter { it.localUriString != null }
+        assertEquals(1, onlyLocal.size)
+        assertEquals("loc_42", onlyLocal.first().id)
+
+        val engine = MultiStemAudioEngine()
+        engine.loadTrack(localTrack, autoPlay = false)
+        val customPeaks = List(64) { 0.88f }
+        engine.updateTrackWaveforms("loc_42", customPeaks)
+        assertEquals(0.88f, engine.state.value.currentTrack!!.analysis.stems.first().waveformPeaks.first(), 0.001f)
         engine.release()
     }
 }

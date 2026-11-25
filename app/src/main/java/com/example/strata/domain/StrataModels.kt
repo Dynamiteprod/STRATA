@@ -198,7 +198,8 @@ data class Track(
     val rootPitchMidi: Int,
     val isDownloadedOffline: Boolean = false,
     val isFork: Boolean = false,
-    val forkAuthorUserId: String? = null
+    val forkAuthorUserId: String? = null,
+    val localUriString: String? = null
 )
 
 data class AlignmentPoint(
