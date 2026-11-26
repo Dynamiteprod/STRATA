@@ -4,6 +4,7 @@ import com.example.strata.data.LocalMusicRepository
 import com.example.strata.data.StrataCatalog
 import com.example.strata.domain.StemType
 import com.example.strata.engine.MultiStemAudioEngine
+import com.example.strata.engine.StrataPlaybackController
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -91,5 +92,26 @@ class CatalogAndEngineTest {
         engine.updateTrackWaveforms("loc_42", customPeaks)
         assertEquals(0.88f, engine.state.value.currentTrack!!.analysis.stems.first().waveformPeaks.first(), 0.001f)
         engine.release()
+    }
+
+    @Test
+    fun `playback controller cycles next, previous, pause, and play without context`() {
+        StrataPlaybackController.init(null)
+        val first = StrataCatalog.tracks[0]
+        val second = StrataCatalog.tracks[1]
+        StrataPlaybackController.updatePlaylist(listOf(first, second))
+
+        StrataPlaybackController.playTrack(first, autoPlay = false)
+        assertEquals(first.id, StrataPlaybackController.audioEngine.state.value.currentTrack?.id)
+
+        StrataPlaybackController.playNext()
+        assertEquals(second.id, StrataPlaybackController.audioEngine.state.value.currentTrack?.id)
+
+        StrataPlaybackController.playPrevious()
+        assertEquals(first.id, StrataPlaybackController.audioEngine.state.value.currentTrack?.id)
+
+        StrataPlaybackController.pause()
+        assertFalse(StrataPlaybackController.audioEngine.state.value.isPlaying)
+        StrataPlaybackController.audioEngine.release()
     }
 }

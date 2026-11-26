@@ -42,6 +42,7 @@ import com.example.strata.engine.ClockSyncProtocol
 import com.example.strata.engine.LedgerEngine
 import com.example.strata.engine.LocalAudioStreamDecoder
 import com.example.strata.engine.MultiStemAudioEngine
+import com.example.strata.engine.StrataPlaybackController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,7 +67,8 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
         val HAPTIC_BEATS = booleanPreferencesKey("haptic_beats")
     }
 
-    val audioEngine = MultiStemAudioEngine()
+    val audioEngine: MultiStemAudioEngine
+        get() = StrataPlaybackController.audioEngine
 
     data class UiState(
         val catalog: List<Track> = StrataCatalog.tracks,
@@ -114,7 +116,14 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
     private val sampledWaveformIds = mutableSetOf<String>()
 
     init {
-        audioEngine.attachContext(application)
+        StrataPlaybackController.init(application)
+        StrataPlaybackController.updatePlaylist(_uiState.value.catalog)
+        StrataPlaybackController.onTrackStarted = { startedTrack, fork ->
+            recordPlayInLedger(startedTrack, fork)
+        }
+        StrataPlaybackController.onErrorMessage = { msg ->
+            showToast(msg)
+        }
         val detectedNet = detectNetworkContext(application)
         val initialQuality = if (detectedNet == NetworkContext.CELLULAR) StreamingQuality.ECO else StreamingQuality.NORMAL
         val audioGranted = hasRequiredAudioPermission(application)
@@ -122,7 +131,9 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
             it.copy(
                 networkContext = detectedNet,
                 streamingQuality = initialQuality,
-                hasAudioPermission = audioGranted
+                hasAudioPermission = audioGranted,
+                shuffleEnabled = StrataPlaybackController.shuffleEnabled,
+                repeatEnabled = StrataPlaybackController.repeatEnabled
             )
         }
 
@@ -156,13 +167,9 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
-        // Load first track ready to play (paused initially until user hits play or taps a track)
-        audioEngine.loadTrack(StrataCatalog.tracks.first(), autoPlay = false)
-        audioEngine.setOnTrackEndedListener {
-            playNextTrack()
-        }
-        audioEngine.setOnPlaybackErrorListener { msg ->
-            showToast(msg)
+        // Load first track ready to play only if nothing is currently loaded/playing
+        if (audioEngine.state.value.currentTrack == null) {
+            audioEngine.loadTrack(StrataCatalog.tracks.first(), autoPlay = false)
         }
         if (audioGranted) {
             scanLocalMusic(showFeedback = false)
@@ -200,6 +207,7 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
                 val baseCatalog = state.catalog.filter { it.localUriString == null }
                 val mergedLocal = (existingPicked + scanned).distinctBy { it.localUriString }
                 val mergedCatalog = mergedLocal + baseCatalog
+                StrataPlaybackController.updatePlaylist(mergedCatalog)
                 state.copy(
                     catalog = mergedCatalog,
                     queueTrackIds = mergedCatalog.map { it.id },
@@ -238,6 +246,7 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
                 val baseCatalog = state.catalog.filter { it.localUriString == null }
                 val mergedLocal = (imported + existingLocal).distinctBy { it.localUriString }
                 val mergedCatalog = mergedLocal + baseCatalog
+                StrataPlaybackController.updatePlaylist(mergedCatalog)
                 state.copy(
                     catalog = mergedCatalog,
                     queueTrackIds = mergedCatalog.map { it.id },
@@ -305,7 +314,7 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playTrack(track: Track, expandPlayer: Boolean = true, fork: ForkSpec? = null) {
-        audioEngine.loadTrack(track, autoPlay = true, fork = fork)
+        StrataPlaybackController.playTrack(track, autoPlay = true, fork = fork)
         if (fork != null) {
             _uiState.update { it.copy(currentDepth = DepthLevel.STUDIO) }
         }
@@ -329,13 +338,12 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
                             )
                         } else t
                     }
+                    StrataPlaybackController.updatePlaylist(updatedCatalog)
                     state.copy(catalog = updatedCatalog)
                 }
                 audioEngine.updateTrackWaveforms(track.id, realPeaks)
             }
         }
-        // Record play event into double-entry ledger
-        recordPlayInLedger(track, fork)
     }
 
     private fun recordPlayInLedger(track: Track, fork: ForkSpec?) {
@@ -355,42 +363,32 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun togglePlayPause() {
-        audioEngine.togglePlayPause()
+        StrataPlaybackController.togglePlayPause()
     }
 
     fun seekToMs(ms: Long) {
-        audioEngine.seekToMs(ms)
+        StrataPlaybackController.seekToMs(ms)
     }
 
     fun playNextTrack() {
-        val s = _uiState.value
-        val currentId = playbackState.value.currentTrack?.id
-        val list = s.catalog
-        if (list.isEmpty()) return
-        val nextTrack = if (s.shuffleEnabled && list.size > 1) {
-            list.filter { it.id != currentId }.random()
-        } else {
-            val idx = list.indexOfFirst { it.id == currentId }
-            list[(idx + 1) % list.size]
-        }
-        playTrack(nextTrack, expandPlayer = s.isPlayerExpanded)
+        StrataPlaybackController.playNext()
     }
 
     fun playPreviousTrack() {
-        val pos = playbackState.value.positionMs
-        if (pos > 3500L) {
-            audioEngine.seekToMs(0L)
-            return
-        }
-        val list = _uiState.value.catalog
-        val currentId = playbackState.value.currentTrack?.id
-        val idx = list.indexOfFirst { it.id == currentId }
-        val prevIdx = if (idx <= 0) list.lastIndex else idx - 1
-        playTrack(list[prevIdx], expandPlayer = _uiState.value.isPlayerExpanded)
+        StrataPlaybackController.playPrevious()
     }
 
-    fun toggleShuffle() = _uiState.update { it.copy(shuffleEnabled = !it.shuffleEnabled) }
-    fun toggleRepeat() = _uiState.update { it.copy(repeatEnabled = !it.repeatEnabled) }
+    fun toggleShuffle() {
+        val next = !_uiState.value.shuffleEnabled
+        StrataPlaybackController.setShuffle(next)
+        _uiState.update { it.copy(shuffleEnabled = next) }
+    }
+
+    fun toggleRepeat() {
+        val next = !_uiState.value.repeatEnabled
+        StrataPlaybackController.setRepeat(next)
+        _uiState.update { it.copy(repeatEnabled = next) }
+    }
 
     /**
      * Depth slider selection (Crans 0 to 4) enforcing plan entitlements,
@@ -804,7 +802,7 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
         val track = _uiState.value.catalog.firstOrNull { it.id == session.trackId } ?: return
         // Apply host stems in local engine so user hears their assigned role (or rehearsal mute!)
         val host = session.participants.firstOrNull { it.isHost }
-        audioEngine.loadTrack(track, autoPlay = true)
+        StrataPlaybackController.playTrack(track, autoPlay = true)
         audioEngine.setStemsMode(true)
         StemType.entries.forEach { st ->
             val shouldMute = when (session.mode) {
@@ -847,9 +845,11 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
             ),
             isDownloadedOffline = true
         )
+        val updatedList = listOf(newTrack) + _uiState.value.catalog
+        StrataPlaybackController.updatePlaylist(updatedList)
         _uiState.update {
             it.copy(
-                catalog = listOf(newTrack) + it.catalog
+                catalog = updatedList
             )
         }
         showToast("Ingestion terminée : EBU R128 -14 LUFS, ${if (hasOfficialStems) "stems officiels" else "séparation IA 4 stems"}, ISRC vérifié.")
@@ -913,6 +913,7 @@ class StrataViewModel(application: Application) : AndroidViewModel(application) 
 
     override fun onCleared() {
         super.onCleared()
-        audioEngine.release()
+        StrataPlaybackController.onTrackStarted = null
+        StrataPlaybackController.onErrorMessage = null
     }
 }

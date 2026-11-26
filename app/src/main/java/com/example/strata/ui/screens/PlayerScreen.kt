@@ -13,17 +13,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -32,11 +32,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudDownload
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Loop
 import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -49,9 +49,9 @@ import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -62,6 +62,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -111,13 +112,13 @@ fun MiniPlayerBar(
 
     Surface(
         color = StudioSurfaceHigh,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(16.dp),
         tonalElevation = 6.dp,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .border(1.dp, StudioBorder, RoundedCornerShape(18.dp))
-            .clip(RoundedCornerShape(18.dp))
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .border(1.dp, StudioBorder, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onExpand)
             .testTag("mini_player_bar")
     ) {
@@ -125,7 +126,7 @@ fun MiniPlayerBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -140,18 +141,22 @@ fun MiniPlayerBar(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = playback.activeFork?.title ?: track.title,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             text = "Cran ${currentDepth.level} • ${currentDepth.labelFr}",
                             style = MaterialTheme.typography.labelSmall,
                             color = TerracottaPrimary
                         )
                         Text(
-                            text = "${(track.analysis.tempo.bpm * playback.tempoMultiplier).toInt()} BPM",
+                            text = if (track.localUriString != null) "Téléphone" else "${(track.analysis.tempo.bpm * playback.tempoMultiplier).toInt()} BPM",
                             style = MaterialTheme.typography.labelSmall,
                             color = KoraGold
                         )
@@ -214,14 +219,20 @@ fun ExpandedStudioPlayer(
                 )
             )
             .statusBarsPadding()
-            .navigationBarsPadding()
+            .navigationBarsPadding(),
+        contentAlignment = Alignment.TopCenter
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Top Studio Header: Collapse + Lineage Pill + Share
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .widthIn(max = 560.dp)
+                .fillMaxWidth()
+        ) {
+            // 1. Sleek Top Header: Collapse + Lineage Pill + Share
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -232,38 +243,46 @@ fun ExpandedStudioPlayer(
                     Icon(
                         Icons.Rounded.KeyboardArrowDown,
                         contentDescription = "Réduire le lecteur",
-                        modifier = Modifier.size(30.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
 
-                // Playable Genealogy pill (also triggerable by vertical swipe on cover!)
                 Surface(
                     onClick = { viewModel.setShowGenealogySheet(true) },
-                    color = if (links.isNotEmpty()) TerracottaPrimary.copy(alpha = 0.2f) else StudioSurface,
+                    color = if (links.isNotEmpty()) TerracottaPrimary.copy(alpha = 0.18f) else StudioSurface,
                     shape = RoundedCornerShape(50),
                     modifier = Modifier
                         .border(
                             1.dp,
-                            if (links.isNotEmpty()) TerracottaPrimary else StudioBorder,
+                            if (links.isNotEmpty()) TerracottaPrimary.copy(alpha = 0.65f) else StudioBorder,
                             RoundedCornerShape(50)
                         )
                         .testTag("lineage_pill_btn")
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            Icons.Rounded.AccountTree,
+                            imageVector = if (track.localUriString != null) Icons.Rounded.AudioFile else Icons.Rounded.AccountTree,
                             contentDescription = "Généalogie jouable",
-                            tint = if (links.isNotEmpty()) TerracottaPrimary else TextMuted,
-                            modifier = Modifier.size(16.dp)
+                            tint = when {
+                                links.isNotEmpty() -> TerracottaPrimary
+                                track.localUriString != null -> LaguneTeal
+                                else -> TextMuted
+                            },
+                            modifier = Modifier.size(15.dp)
                         )
                         Text(
-                            text = if (links.isNotEmpty()) "Lignée (${links.size}) • Glisser ↕" else "Lignée",
+                            text = when {
+                                links.isNotEmpty() -> "Lignée (${links.size}) • ↕"
+                                track.localUriString != null -> "Fichier du téléphone"
+                                else -> "Lignée"
+                            },
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1
                         )
                     }
                 }
@@ -272,15 +291,28 @@ fun ExpandedStudioPlayer(
                     onClick = { viewModel.shareTimestampLink() },
                     modifier = Modifier.testTag("share_timestamp_btn")
                 ) {
-                    Icon(Icons.Rounded.Share, contentDescription = "Partager ce moment")
+                    Icon(
+                        Icons.Rounded.Share,
+                        contentDescription = "Partager ce moment",
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
             }
+
+            // 2. Full-Width 5-Cran Studio Depth Selector (never squeezes phone width!)
+            HorizontalDepthBar(
+                currentDepth = depth,
+                maxAllowedDepth = uiState.currentPlan.maxDepthAllowed,
+                pendingDownbeat = playback.pendingMixToStemsOnDownbeat,
+                onSelectDepth = { viewModel.selectDepthLevel(it) },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
 
             // Pending genealogy crossfade indicator
             AnimatedVisibility(visible = playback.pendingTransition != null) {
                 playback.pendingTransition?.let { pending ->
                     Surface(
-                        color = KoraGold.copy(alpha = 0.2f),
+                        color = KoraGold.copy(alpha = 0.18f),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -296,63 +328,71 @@ fun ExpandedStudioPlayer(
                 }
             }
 
-            // Main Content + Right-Edge One-Handed Depth Slider
-            Row(
+            // 3. Full-Width Scrollable Studio Layers
+            LazyColumn(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // CRAN 0: ÉCOUTE (Always visible; cover shrinks smoothly as depth unfolds!)
-                    item {
-                        val isCompactHeader = depth.level >= 2
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .pointerInput(track.id) {
-                                    detectVerticalDragGestures(
-                                        onDragEnd = {
-                                            if (kotlin.math.abs(dragAccum) > 70f) {
-                                                viewModel.swipeNextLinkedVersion()
-                                            }
-                                            dragAccum = 0f
-                                        },
-                                        onVerticalDrag = { _, dragAmount -> dragAccum += dragAmount }
+                // CRAN 0: Cover & Track Info (compact bar when depth >= 1)
+                item {
+                    val isCompactHeader = depth.level >= 1
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .pointerInput(track.id) {
+                                detectVerticalDragGestures(
+                                    onDragEnd = {
+                                        if (kotlin.math.abs(dragAccum) > 70f) {
+                                            viewModel.swipeNextLinkedVersion()
+                                        }
+                                        dragAccum = 0f
+                                    },
+                                    onVerticalDrag = { _, dragAmount -> dragAccum += dragAmount }
+                                )
+                            }
+                    ) {
+                        if (!isCompactHeader) {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(216.dp)
+                                        .clip(RoundedCornerShape(22.dp))
+                                        .border(
+                                            width = if (playback.spectrum.activeBeatInBar == 1 && playback.isPlaying) 2.dp else 1.dp,
+                                            color = if (playback.spectrum.activeBeatInBar == 1 && playback.isPlaying) TerracottaPrimary else StudioBorder,
+                                            shape = RoundedCornerShape(22.dp)
+                                        )
+                                ) {
+                                    Image(
+                                        painter = painterResource(id = track.coverResId),
+                                        contentDescription = "Pochette ${track.title}",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
                                     )
-                                }
-                        ) {
-                            if (!isCompactHeader) {
-                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(210.dp)
-                                            .clip(RoundedCornerShape(22.dp))
-                                            .border(
-                                                width = if (playback.spectrum.activeBeatInBar == 1 && playback.isPlaying) 2.dp else 1.dp,
-                                                color = if (playback.spectrum.activeBeatInBar == 1 && playback.isPlaying) TerracottaPrimary else StudioBorder,
-                                                shape = RoundedCornerShape(22.dp)
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    listOf(Color.Transparent, ObsidianBg.copy(alpha = 0.55f))
+                                                )
                                             )
+                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomStart)
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Image(
-                                            painter = painterResource(id = track.coverResId),
-                                            contentDescription = "Pochette ${track.title}",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                        // Beat pulse badge
                                         Surface(
-                                            color = ObsidianBg.copy(alpha = 0.78f),
-                                            shape = RoundedCornerShape(50),
-                                            modifier = Modifier
-                                                .align(Alignment.BottomStart)
-                                                .padding(10.dp)
+                                            color = ObsidianBg.copy(alpha = 0.80f),
+                                            shape = RoundedCornerShape(50)
                                         ) {
                                             Text(
                                                 text = "Mesure ${playback.spectrum.currentBarNumber} • Temps ${playback.spectrum.activeBeatInBar}/4",
@@ -361,161 +401,179 @@ fun ExpandedStudioPlayer(
                                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                             )
                                         }
+                                        Surface(
+                                            color = ObsidianBg.copy(alpha = 0.80f),
+                                            shape = RoundedCornerShape(50)
+                                        ) {
+                                            Text(
+                                                text = if (track.localUriString != null) {
+                                                    "Audio Local • 4 Stems"
+                                                } else {
+                                                    "${uiState.streamingQuality.label} ${uiState.streamingQuality.kbps} kb/s"
+                                                },
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = LaguneTeal,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                            )
+                                        }
                                     }
-                                    TrackHeaderInfoRow(track, playback, uiState.streamingQuality, viewModel)
                                 }
-                            } else {
+                                TrackHeaderInfoRow(track, playback, uiState.streamingQuality, viewModel)
+                            }
+                        } else {
+                            Surface(
+                                color = StudioSurface,
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, StudioBorder, RoundedCornerShape(14.dp))
+                            ) {
                                 Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     Image(
                                         painter = painterResource(id = track.coverResId),
                                         contentDescription = "Pochette ${track.title}",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
-                                            .size(56.dp)
-                                            .clip(RoundedCornerShape(12.dp))
+                                            .size(48.dp)
+                                            .clip(RoundedCornerShape(10.dp))
                                     )
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = playback.activeFork?.title ?: track.title,
-                                            style = MaterialTheme.typography.titleMedium,
+                                            style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.Bold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
                                             text = "${track.artistName} • Mes. ${playback.spectrum.currentBarNumber}.${playback.spectrum.activeBeatInBar}",
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            style = MaterialTheme.typography.bodySmall,
                                             color = TextSecondary,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     }
-                                    IconButton(onClick = { viewModel.toggleTrackOffline(track.id) }) {
-                                        Icon(
-                                            imageVector = if (track.isDownloadedOffline) Icons.Rounded.CheckCircle else Icons.Rounded.CloudDownload,
-                                            contentDescription = "Hors-ligne",
-                                            tint = if (track.isDownloadedOffline) LaguneTeal else TextMuted
-                                        )
+                                    if (track.localUriString == null) {
+                                        IconButton(onClick = { viewModel.toggleTrackOffline(track.id) }) {
+                                            Icon(
+                                                imageVector = if (track.isDownloadedOffline) Icons.Rounded.CheckCircle else Icons.Rounded.CloudDownload,
+                                                contentDescription = "Hors-ligne",
+                                                tint = if (track.isDownloadedOffline) LaguneTeal else TextMuted
+                                            )
+                                        }
+                                    } else {
+                                        MetaTagPill("Local", LaguneTeal)
                                     }
                                 }
                             }
                         }
                     }
+                }
 
-                    // CRAN 1+: PAROLES SYNCHRONISÉES (& ACCORDS SI CRAN >= 2)
-                    if (depth.level >= 1) {
-                        item {
-                            LyricsAndChordsLayer(
-                                track = track,
-                                positionSec = playback.positionMs / 1000.0,
-                                showChords = depth.level >= 2,
-                                transposeSemitones = playback.transposeSemitones,
-                                onJumpToSec = { sec -> viewModel.seekToMs((sec * 1000.0).toLong()) }
-                            )
-                        }
-                    }
-
-                    // CRAN 2+: MUSICIEN (Structure, Tempo 50-150%, Transposition, Boucle A-B)
-                    if (depth.level >= 2) {
-                        item {
-                            MusicianToolsLayer(
-                                track = track,
-                                playback = playback,
-                                onSelectSection = { sec -> viewModel.seekToMs((sec * 1000.0).toLong()) },
-                                onTempoChange = { viewModel.setTempoMultiplier(it) },
-                                onTranspose = { viewModel.setTranspose(it) },
-                                onLoopA = { viewModel.setLoopA() },
-                                onLoopB = { viewModel.setLoopB() },
-                                onClearLoop = { viewModel.clearLoop() }
-                            )
-                        }
-                    }
-
-                    // CRAN 3+: PISTES SÉPARÉES (Stems + Mode Karaoké)
-                    if (depth.level >= 3) {
-                        item {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Pistes séparées (${track.analysis.stems.size})",
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                FilterChip(
-                                    selected = playback.karaokeMode,
-                                    onClick = { viewModel.toggleKaraoke() },
-                                    label = { Text("Mode Karaoké") },
-                                    leadingIcon = {
-                                        Icon(Icons.Rounded.MicOff, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = TerracottaPrimary,
-                                        selectedLabelColor = Color.White
-                                    ),
-                                    modifier = Modifier.testTag("karaoke_mode_btn")
-                                )
-                            }
-                        }
-
-                        items(StemType.entries, key = { it.id }) { stemType ->
-                            val mixState = playback.stemMix[stemType] ?: return@items
-                            val stemMeta = track.analysis.stems.firstOrNull { it.type == stemType }
-                            val srcLabel = if (stemMeta?.source?.wire == "official") "Studio" else "IA"
-                            StemChannelStrip(
-                                mixState = mixState,
-                                stemSourceLabel = srcLabel,
-                                isSelectedForStudio = depth.level >= 4 && selectedStudioStem == stemType,
-                                onSelectForStudio = { selectedStudioStem = stemType },
-                                onVolumeChange = { vol -> viewModel.updateStem(stemType) { it.copy(volume = vol) } },
-                                onToggleMute = { viewModel.updateStem(stemType) { it.copy(muted = !it.muted) } },
-                                onToggleSolo = { viewModel.updateStem(stemType) { it.copy(solo = !it.solo) } }
-                            )
-                        }
-                    }
-
-                    // CRAN 4: STUDIO (Waveform, Pan, 3-Band EQ, Spectrum, Export, Fork)
-                    if (depth.level >= 4) {
-                        item {
-                            val activeStemState = playback.stemMix[selectedStudioStem] ?: return@item
-                            StudioAnalysisPanel(
-                                track = track,
-                                selectedStem = activeStemState,
-                                playback = playback,
-                                onPanChange = { p -> viewModel.updateStem(selectedStudioStem) { it.copy(pan = p) } },
-                                onEqChange = { l, m, h ->
-                                    viewModel.updateStem(selectedStudioStem) {
-                                        it.copy(eqLowDb = l, eqMidDb = m, eqHighDb = h)
-                                    }
-                                },
-                                onExportLoop = { viewModel.exportCurrentLoop() },
-                                onOpenForkDialog = { viewModel.setShowForkDialog(true) }
-                            )
-                        }
+                // CRAN 1+: PAROLES SYNCHRONISÉES (& ACCORDS SI CRAN >= 2)
+                if (depth.level >= 1) {
+                    item {
+                        LyricsAndChordsLayer(
+                            track = track,
+                            positionSec = playback.positionMs / 1000.0,
+                            showChords = depth.level >= 2,
+                            transposeSemitones = playback.transposeSemitones,
+                            onJumpToSec = { sec -> viewModel.seekToMs((sec * 1000.0).toLong()) }
+                        )
                     }
                 }
 
-                // Right-edge One-handed Depth Slider
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(end = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    VerticalDepthRail(
-                        currentDepth = depth,
-                        maxAllowedDepth = uiState.currentPlan.maxDepthAllowed,
-                        pendingDownbeat = playback.pendingMixToStemsOnDownbeat,
-                        onSelectDepth = { viewModel.selectDepthLevel(it) }
-                    )
+                // CRAN 2+: MUSICIEN (Structure, Tempo 50-150%, Transposition, Boucle A-B)
+                if (depth.level >= 2) {
+                    item {
+                        MusicianToolsLayer(
+                            track = track,
+                            playback = playback,
+                            onSelectSection = { sec -> viewModel.seekToMs((sec * 1000.0).toLong()) },
+                            onTempoChange = { viewModel.setTempoMultiplier(it) },
+                            onTranspose = { viewModel.setTranspose(it) },
+                            onLoopA = { viewModel.setLoopA() },
+                            onLoopB = { viewModel.setLoopB() },
+                            onClearLoop = { viewModel.clearLoop() }
+                        )
+                    }
+                }
+
+                // CRAN 3+: PISTES SÉPARÉES (Stems + Mode Karaoké)
+                if (depth.level >= 3) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Mixage 4 pistes",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            FilterChip(
+                                selected = playback.karaokeMode,
+                                onClick = { viewModel.toggleKaraoke() },
+                                label = { Text("Mode Karaoké") },
+                                leadingIcon = {
+                                    Icon(Icons.Rounded.MicOff, contentDescription = null, modifier = Modifier.size(16.dp))
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = TerracottaPrimary,
+                                    selectedLabelColor = Color.White
+                                ),
+                                modifier = Modifier
+                                    .heightIn(min = 48.dp)
+                                    .testTag("karaoke_mode_btn")
+                            )
+                        }
+                    }
+
+                    items(StemType.entries, key = { it.id }) { stemType ->
+                        val mixState = playback.stemMix[stemType] ?: return@items
+                        val stemMeta = track.analysis.stems.firstOrNull { it.type == stemType }
+                        val srcLabel = if (stemMeta?.source?.wire == "official") "Studio" else "IA"
+                        StemChannelStrip(
+                            mixState = mixState,
+                            stemSourceLabel = srcLabel,
+                            isSelectedForStudio = depth.level >= 4 && selectedStudioStem == stemType,
+                            onSelectForStudio = { selectedStudioStem = stemType },
+                            onVolumeChange = { vol -> viewModel.updateStem(stemType) { it.copy(volume = vol) } },
+                            onToggleMute = { viewModel.updateStem(stemType) { it.copy(muted = !it.muted) } },
+                            onToggleSolo = { viewModel.updateStem(stemType) { it.copy(solo = !it.solo) } }
+                        )
+                    }
+                }
+
+                // CRAN 4: STUDIO (Waveform, Pan, 3-Band EQ, Spectrum, Export, Fork)
+                if (depth.level >= 4) {
+                    item {
+                        val activeStemState = playback.stemMix[selectedStudioStem] ?: return@item
+                        StudioAnalysisPanel(
+                            track = track,
+                            selectedStem = activeStemState,
+                            playback = playback,
+                            onPanChange = { p -> viewModel.updateStem(selectedStudioStem) { it.copy(pan = p) } },
+                            onEqChange = { l, m, h ->
+                                viewModel.updateStem(selectedStudioStem) {
+                                    it.copy(eqLowDb = l, eqMidDb = m, eqHighDb = h)
+                                }
+                            },
+                            onExportLoop = { viewModel.exportCurrentLoop() },
+                            onOpenForkDialog = { viewModel.setShowForkDialog(true) }
+                        )
+                    }
                 }
             }
 
-            // Bottom Transport Controls (Always present across all 5 crans)
+            // 4. Sleek, Proportional Bottom Transport Controls
             TransportControlsBar(
                 playback = playback,
                 shuffleEnabled = uiState.shuffleEnabled,
@@ -588,30 +646,46 @@ private fun TrackHeaderInfoRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = playback.activeFork?.title ?: track.title,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = if (track.localUriString != null) {
+                    "${track.artistName} • ${track.releaseTitle}"
+                } else {
+                    "${track.artistName} • ${track.genre.labelFr}"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = "${track.artistName} • ${track.genre.labelFr}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                MetaTagPill("${quality.label} ${quality.kbps} kb/s", LaguneTeal)
-                MetaTagPill(if (track.isDownloadedOffline) "Hors-ligne ✓" else "Streaming", KoraGold)
+                if (track.localUriString != null) {
+                    MetaTagPill("Téléphone", LaguneTeal)
+                    MetaTagPill("DSP 4 Pistes", KoraGold)
+                } else {
+                    MetaTagPill("${track.analysis.tempo.bpm.toInt()} BPM", KoraGold)
+                    MetaTagPill(track.analysis.key.display(), LaguneTeal)
+                    MetaTagPill(if (track.isDownloadedOffline) "Hors-ligne ✓" else "Streaming ${quality.kbps}k", TextSecondary)
+                }
             }
         }
-        IconButton(
-            onClick = { viewModel.toggleTrackOffline(track.id) },
-            modifier = Modifier.testTag("player_offline_btn")
-        ) {
-            Icon(
-                imageVector = if (track.isDownloadedOffline) Icons.Rounded.CheckCircle else Icons.Rounded.CloudDownload,
-                contentDescription = "Téléchargement hors-ligne",
-                tint = if (track.isDownloadedOffline) LaguneTeal else TextMuted
-            )
+        if (track.localUriString == null) {
+            IconButton(
+                onClick = { viewModel.toggleTrackOffline(track.id) },
+                modifier = Modifier.testTag("player_offline_btn")
+            ) {
+                Icon(
+                    imageVector = if (track.isDownloadedOffline) Icons.Rounded.CheckCircle else Icons.Rounded.CloudDownload,
+                    contentDescription = "Téléchargement hors-ligne",
+                    tint = if (track.isDownloadedOffline) LaguneTeal else TextMuted
+                )
+            }
         }
     }
 }
@@ -643,9 +717,10 @@ private fun LyricsAndChordsLayer(
                 Text(
                     text = if (showChords) "Paroles & Accords" else "Paroles synchronisées",
                     style = MaterialTheme.typography.titleMedium,
-                    color = KoraGold
+                    color = KoraGold,
+                    fontWeight = FontWeight.Bold
                 )
-                if (showChords && !track.analysis.hasVerifiedChords) {
+                if (showChords && !track.analysis.hasVerifiedChords && track.localUriString == null) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -665,7 +740,7 @@ private fun LyricsAndChordsLayer(
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (isActive) TerracottaPrimary.copy(alpha = 0.16f) else Color.Transparent)
                         .clickable { onJumpToSec(line.startSec) }
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     if (showChords && lineChord != null) {
                         Text(
@@ -708,14 +783,14 @@ private fun MusicianToolsLayer(
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Outils Musicien", style = MaterialTheme.typography.titleMedium)
+                Text("Outils Musicien", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     MetaTagPill("$effectiveBpm BPM", KoraGold)
                     MetaTagPill(transposeChordLabel(track.analysis.key.display(), playback.transposeSemitones), LaguneTeal)
@@ -723,7 +798,7 @@ private fun MusicianToolsLayer(
             }
 
             // Structure segments (Intro / Couplet / Refrain / Pont)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(track.analysis.sections) { sec ->
                     val currentSec = playback.positionMs / 1000.0
                     val active = currentSec >= sec.startSec && currentSec < sec.endSec
@@ -740,51 +815,130 @@ private fun MusicianToolsLayer(
             }
 
             // Time-stretch slider 50% - 150% without pitch change
-            Column {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Vitesse (hauteur préservée)", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-                    Text("${(playback.tempoMultiplier * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = KoraGold)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Vitesse (tempo)", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "${(playback.tempoMultiplier * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = KoraGold,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (kotlin.math.abs(playback.tempoMultiplier - 1.0f) > 0.02f) {
+                            Surface(
+                                onClick = { onTempoChange(1.0f) },
+                                color = StudioSurfaceHigh,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "1×",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                    }
                 }
                 Slider(
                     value = playback.tempoMultiplier,
                     onValueChange = onTempoChange,
                     valueRange = 0.50f..1.50f,
                     colors = SliderDefaults.colors(thumbColor = KoraGold, activeTrackColor = KoraGold),
-                    modifier = Modifier.testTag("tempo_slider")
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(32.dp)
+                        .testTag("tempo_slider")
                 )
             }
 
-            // Transposition + Bar-locked A-B loop
+            HorizontalDivider(color = StudioBorder)
+
+            // Row 1: Transposition
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Ton", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-                    IconButton(onClick = { onTranspose(playback.transposeSemitones - 1) }) {
-                        Icon(Icons.Rounded.Remove, contentDescription = "Baisser d'un demi-ton")
+                Text("Transposition", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Surface(
+                        onClick = { onTranspose(playback.transposeSemitones - 1) },
+                        color = StudioSurfaceHigh,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .size(width = 44.dp, height = 38.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.Remove, contentDescription = "Baisser d'un demi-ton", modifier = Modifier.size(18.dp))
+                        }
                     }
                     Text(
-                        text = "${if (playback.transposeSemitones > 0) "+" else ""}${playback.transposeSemitones}",
+                        text = "${if (playback.transposeSemitones > 0) "+" else ""}${playback.transposeSemitones} st",
                         style = MaterialTheme.typography.labelLarge,
-                        color = LaguneTeal
+                        color = LaguneTeal,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp)
                     )
-                    IconButton(onClick = { onTranspose(playback.transposeSemitones + 1) }) {
-                        Icon(Icons.Rounded.Add, contentDescription = "Monter d'un demi-ton")
+                    Surface(
+                        onClick = { onTranspose(playback.transposeSemitones + 1) },
+                        color = StudioSurfaceHigh,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .size(width = 44.dp, height = 38.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.Add, contentDescription = "Monter d'un demi-ton", modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
+            }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = onLoopA, contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.testTag("loop_a_btn")) {
-                        Text(if (playback.loopStartMs != null) "A ✓" else "A")
+            // Row 2: Bar-locked A-B Loop
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Boucle A–B", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = onLoopA,
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("loop_a_btn")
+                    ) {
+                        Text(if (playback.loopStartMs != null) "Point A ✓" else "Point A")
                     }
-                    OutlinedButton(onClick = onLoopB, contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.testTag("loop_b_btn")) {
-                        Text(if (playback.loopEndMs != null) "B ✓" else "B")
+                    OutlinedButton(
+                        onClick = onLoopB,
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("loop_b_btn")
+                    ) {
+                        Text(if (playback.loopEndMs != null) "Point B ✓" else "Point B")
                     }
                     if (playback.loopStartMs != null || playback.loopEndMs != null) {
                         IconButton(onClick = onClearLoop) {
-                            Icon(Icons.Rounded.Loop, contentDescription = "Couper la boucle", tint = TerracottaPrimary)
+                            Icon(Icons.Rounded.Close, contentDescription = "Effacer la boucle", tint = TerracottaPrimary)
                         }
                     }
                 }
@@ -810,59 +964,80 @@ private fun TransportControlsBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(StudioSurface)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Slider(
-            value = playback.positionMs.toFloat().coerceIn(0f, dur.toFloat()),
-            onValueChange = { onSeek(it.toLong()) },
-            valueRange = 0f..dur.toFloat(),
-            colors = SliderDefaults.colors(thumbColor = TerracottaPrimary, activeTrackColor = TerracottaPrimary)
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatTimeMs(playback.positionMs), style = MaterialTheme.typography.labelSmall, color = TextMuted)
-            Text(formatTimeMs(dur), style = MaterialTheme.typography.labelSmall, color = TextMuted)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+        HorizontalDivider(color = StudioBorder)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
         ) {
-            IconButton(onClick = onToggleShuffle) {
-                Icon(
-                    Icons.Rounded.Shuffle,
-                    contentDescription = "Aléatoire",
-                    tint = if (shuffleEnabled) TerracottaPrimary else TextMuted
-                )
-            }
-            IconButton(onClick = onPrev) {
-                Icon(Icons.Rounded.SkipPrevious, contentDescription = "Précédent", modifier = Modifier.size(32.dp))
-            }
-            Surface(
-                onClick = onTogglePlay,
-                color = TerracottaPrimary,
-                shape = CircleShape,
+            Slider(
+                value = playback.positionMs.toFloat().coerceIn(0f, dur.toFloat()),
+                onValueChange = { onSeek(it.toLong()) },
+                valueRange = 0f..dur.toFloat(),
+                colors = SliderDefaults.colors(
+                    thumbColor = TerracottaPrimary,
+                    activeTrackColor = TerracottaPrimary,
+                    inactiveTrackColor = StudioBorder
+                ),
                 modifier = Modifier
-                    .size(58.dp)
-                    .testTag("player_play_pause_btn")
+                    .fillMaxWidth()
+                    .height(28.dp)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                Text(formatTimeMs(playback.positionMs), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text(formatTimeMs(dur), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onToggleShuffle) {
                     Icon(
-                        imageVector = if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (playback.isPlaying) "Pause" else "Lecture",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                        Icons.Rounded.Shuffle,
+                        contentDescription = "Aléatoire",
+                        tint = if (shuffleEnabled) TerracottaPrimary else TextMuted,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
-            }
-            IconButton(onClick = onNext) {
-                Icon(Icons.Rounded.SkipNext, contentDescription = "Suivant", modifier = Modifier.size(32.dp))
-            }
-            IconButton(onClick = onToggleRepeat) {
-                Icon(
-                    Icons.Rounded.Repeat,
-                    contentDescription = "Répéter",
-                    tint = if (repeatEnabled) TerracottaPrimary else TextMuted
-                )
+                IconButton(onClick = onPrev) {
+                    Icon(Icons.Rounded.SkipPrevious, contentDescription = "Précédent", modifier = Modifier.size(30.dp))
+                }
+                Surface(
+                    onClick = onTogglePlay,
+                    color = TerracottaPrimary,
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .size(54.dp)
+                        .testTag("player_play_pause_btn")
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (playback.isPlaying) "Pause" else "Lecture",
+                            tint = Color.White,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                }
+                IconButton(onClick = onNext) {
+                    Icon(Icons.Rounded.SkipNext, contentDescription = "Suivant", modifier = Modifier.size(30.dp))
+                }
+                IconButton(onClick = onToggleRepeat) {
+                    Icon(
+                        Icons.Rounded.Repeat,
+                        contentDescription = "Répéter",
+                        tint = if (repeatEnabled) TerracottaPrimary else TextMuted,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
     }

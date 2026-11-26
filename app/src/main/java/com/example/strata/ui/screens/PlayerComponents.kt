@@ -7,10 +7,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.CallSplit
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.AutoGraph
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Lyrics
@@ -39,6 +40,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +57,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.strata.domain.DepthLevel
 import com.example.strata.domain.StemMixState
 import com.example.strata.domain.StemType
@@ -85,10 +88,11 @@ fun stemColor(type: StemType): Color = when (type) {
 }
 
 /**
- * One-handed Vertical Depth Slider pinned on the right thumb-zone (Section 3.2 & 18.2).
+ * Full-width 5-Cran Studio Depth Selector Bar.
+ * Placed cleanly below the player header so the audio controls and stems enjoy 100% of phone width.
  */
 @Composable
-fun VerticalDepthRail(
+fun HorizontalDepthBar(
     currentDepth: DepthLevel,
     maxAllowedDepth: Int,
     pendingDownbeat: Boolean,
@@ -96,66 +100,79 @@ fun VerticalDepthRail(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = StudioSurface.copy(alpha = 0.94f),
-        shape = RoundedCornerShape(24.dp),
+        color = StudioSurface,
+        shape = RoundedCornerShape(16.dp),
         modifier = modifier
-            .border(1.dp, StudioBorder, RoundedCornerShape(24.dp))
-            .padding(vertical = 8.dp, horizontal = 4.dp)
+            .fillMaxWidth()
+            .border(1.dp, StudioBorder, RoundedCornerShape(16.dp))
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            // Display top-down 4 -> 0 so Studio is up and Écoute is down
-            DepthLevel.entries.sortedByDescending { it.level }.forEach { depth ->
-                val isSelected = depth == currentDepth
-                val isLocked = depth.level > maxAllowedDepth
-                val icon = when (depth) {
-                    DepthLevel.ECOUTE -> Icons.Rounded.Headphones
-                    DepthLevel.PAROLES -> Icons.Rounded.Lyrics
-                    DepthLevel.MUSICIEN -> Icons.Rounded.MusicNote
-                    DepthLevel.PISTES -> Icons.Rounded.Tune
-                    DepthLevel.STUDIO -> Icons.Rounded.AutoGraph
-                }
-                val bg = when {
-                    isSelected -> TerracottaPrimary
-                    isLocked -> StudioSurfaceHigh.copy(alpha = 0.5f)
-                    else -> StudioSurfaceHigh
-                }
-                Box(
-                    modifier = Modifier
-                        .size(width = 52.dp, height = 52.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(bg)
-                        .clickable { onSelectDepth(depth) }
-                        .testTag("depth_slider_cran_${depth.level}"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = if (isLocked) Icons.Rounded.Lock else icon,
-                            contentDescription = "Cran ${depth.level} ${depth.labelFr}",
-                            tint = when {
-                                isSelected -> Color.White
-                                isLocked -> TextMuted
-                                else -> TextSecondary
-                            },
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "${depth.level} ${depth.labelFr.take(5)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isSelected) Color.White else TextMuted,
-                            maxLines = 1
-                        )
+        Column(modifier = Modifier.padding(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                DepthLevel.entries.sortedBy { it.level }.forEach { depth ->
+                    val isSelected = depth == currentDepth
+                    val isLocked = depth.level > maxAllowedDepth
+                    val icon = when (depth) {
+                        DepthLevel.ECOUTE -> Icons.Rounded.Headphones
+                        DepthLevel.PAROLES -> Icons.Rounded.Lyrics
+                        DepthLevel.MUSICIEN -> Icons.Rounded.MusicNote
+                        DepthLevel.PISTES -> Icons.Rounded.Tune
+                        DepthLevel.STUDIO -> Icons.Rounded.AutoGraph
+                    }
+                    val bg = when {
+                        isSelected -> TerracottaPrimary
+                        isLocked -> StudioSurfaceHigh.copy(alpha = 0.45f)
+                        else -> Color.Transparent
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(bg)
+                            .clickable { onSelectDepth(depth) }
+                            .padding(vertical = 6.dp, horizontal = 2.dp)
+                            .testTag("depth_slider_cran_${depth.level}"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isLocked) Icons.Rounded.Lock else icon,
+                                contentDescription = "Cran ${depth.level} ${depth.labelFr}",
+                                tint = when {
+                                    isSelected -> Color.White
+                                    isLocked -> TextMuted
+                                    else -> TextSecondary
+                                },
+                                modifier = Modifier.size(17.dp)
+                            )
+                            Text(
+                                text = depth.labelFr,
+                                fontSize = 10.sp,
+                                lineHeight = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color.White else TextMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
             if (pendingDownbeat) {
                 Text(
-                    text = "1er tps…",
+                    text = "Bascule stems calée sur le 1er temps suivant…",
                     style = MaterialTheme.typography.labelSmall,
-                    color = KoraGold
+                    color = KoraGold,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 2.dp, bottom = 2.dp)
                 )
             }
         }
@@ -186,7 +203,10 @@ fun StemChannelStrip(
             .clickable(onClick = onSelectForStudio)
             .testTag("stem_strip_${mixState.type.id}")
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -194,7 +214,8 @@ fun StemChannelStrip(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Box(
                         modifier = Modifier
@@ -204,30 +225,47 @@ fun StemChannelStrip(
                     )
                     Text(
                         text = mixState.type.labelFr,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
                     )
+                    Surface(
+                        color = StudioSurface,
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = stemSourceLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                     Text(
-                        text = stemSourceLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextMuted
+                        text = "${(mixState.volume * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = accent,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // 48dp minimum touch targets for M & S
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Surface(
                         onClick = onToggleMute,
                         color = if (mixState.muted) ErrorRed else StudioSurface,
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
-                            .size(48.dp)
+                            .minimumInteractiveComponentSize()
+                            .size(width = 44.dp, height = 36.dp)
                             .testTag("stem_mute_${mixState.type.id}")
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 "M",
                                 style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
                                 color = if (mixState.muted) ObsidianBg else TextSecondary
                             )
                         }
@@ -237,13 +275,15 @@ fun StemChannelStrip(
                         color = if (mixState.solo) KoraGold else StudioSurface,
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
-                            .size(48.dp)
+                            .minimumInteractiveComponentSize()
+                            .size(width = 44.dp, height = 36.dp)
                             .testTag("stem_solo_${mixState.type.id}")
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 "S",
                                 style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
                                 color = if (mixState.solo) ObsidianBg else TextSecondary
                             )
                         }
@@ -251,30 +291,20 @@ fun StemChannelStrip(
                 }
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Slider(
-                    value = mixState.volume,
-                    onValueChange = onVolumeChange,
-                    valueRange = 0f..1.4f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = accent,
-                        activeTrackColor = accent,
-                        inactiveTrackColor = StudioBorder
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("stem_slider_${mixState.type.id}")
-                )
-                Text(
-                    text = "${(mixState.volume * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = accent,
-                    modifier = Modifier.width(44.dp)
-                )
-            }
+            Slider(
+                value = mixState.volume,
+                onValueChange = onVolumeChange,
+                valueRange = 0f..1.4f,
+                colors = SliderDefaults.colors(
+                    thumbColor = accent,
+                    activeTrackColor = accent,
+                    inactiveTrackColor = StudioBorder
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .testTag("stem_slider_${mixState.type.id}")
+            )
         }
     }
 }
@@ -313,10 +343,11 @@ fun StudioAnalysisPanel(
                 Text(
                     text = "Studio • ${selectedStem.type.labelFr}",
                     style = MaterialTheme.typography.titleMedium,
-                    color = accent
+                    color = accent,
+                    fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Peak ${playback.spectrum.peakDbfs.toInt()} dBFS • LUFS ${track.analysis.loudnessLufs}",
+                    text = "Peak ${playback.spectrum.peakDbfs.toInt()} dBFS • ${track.analysis.loudnessLufs} LUFS",
                     style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary
                 )
@@ -326,7 +357,7 @@ fun StudioAnalysisPanel(
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
+                    .height(52.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(ObsidianBg)
                     .padding(horizontal = 4.dp, vertical = 6.dp)
@@ -359,7 +390,7 @@ fun StudioAnalysisPanel(
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(34.dp)
+                    .height(32.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(ObsidianBg)
                     .padding(4.dp)
@@ -380,13 +411,15 @@ fun StudioAnalysisPanel(
 
             // Pan + 3-Band EQ Sliders
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Pan", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(54.dp))
+                Text("Pan", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(60.dp))
                 Slider(
                     value = selectedStem.pan,
                     onValueChange = onPanChange,
                     valueRange = -1f..1f,
                     colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(32.dp)
                 )
                 Text(
                     text = when {
@@ -415,17 +448,21 @@ fun StudioAnalysisPanel(
             ) {
                 OutlinedButton(
                     onClick = onExportLoop,
+                    contentPadding = PaddingValues(horizontal = 10.dp),
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 48.dp)
                         .testTag("export_loop_btn")
                 ) {
                     Text("Exporter boucle", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Button(
                     onClick = onOpenForkDialog,
+                    contentPadding = PaddingValues(horizontal = 10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = KoraGold, contentColor = ObsidianBg),
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 48.dp)
                         .testTag("create_fork_btn")
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.CallSplit, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -440,13 +477,15 @@ fun StudioAnalysisPanel(
 @Composable
 private fun EqBandRow(label: String, db: Float, accent: Color, onChange: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary, modifier = Modifier.width(54.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary, modifier = Modifier.width(60.dp))
         Slider(
             value = db,
             onValueChange = onChange,
             valueRange = -12f..12f,
             colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .height(32.dp)
         )
         Text(
             text = "${if (db >= 0) "+" else ""}${db.toInt()} dB",
